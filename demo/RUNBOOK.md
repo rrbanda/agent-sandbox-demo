@@ -19,22 +19,17 @@ cd /path/to/agent-sandbox-demo
 bash demo/00-setup.sh
 ```
 
-This sets up everything: login, controller, CRDs, Kata, images, platform resources, warm pool pre-warming. The audience never sees this.
+This sets up everything: login, controller, CRDs, Kata, images, platform resources, and waits for warm pool readiness (2/2 ready). The audience never sees this.
 
-Verify warm pools are ready:
+After setup completes, start these in separate terminals:
 
-```bash
-kubectl get sandboxwarmpool -n agent-demo -o jsonpath='{.items[0].status.readyReplicas}'
-# Should print: 2
-```
-
-Start the port-forward to the sandbox-router (leave running in a terminal):
+**Terminal 1** -- port-forward to the sandbox-router:
 
 ```bash
 kubectl port-forward svc/sandbox-router-svc -n agent-demo 8090:8080
 ```
 
-Pre-start the ADK web server (leave running in a second terminal):
+**Terminal 2** -- ADK web server:
 
 ```bash
 cd demo && adk web
