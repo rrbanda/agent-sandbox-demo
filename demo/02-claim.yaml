@@ -1,0 +1,26 @@
+##
+## OPTIONAL -- standalone SandboxClaim for manual testing.
+##
+## This manifest is NOT part of the primary demo flow (see 03-agent-demo.py
+## and TALK-TRACK.md). In the live demo, the Python SDK creates and destroys
+## claims programmatically. This file exists for manual/ad-hoc testing of
+## the claim-adoption lifecycle.
+##
+## The agent framework (or user) creates this claim. The controller finds
+## a ready sandbox in the warm pool and assigns it. No cold start.
+##
+## This separation is key: the platform team defines the SandboxTemplate
+## (security controls), the user creates the SandboxClaim (just a name
+## and a template reference). The user never writes NetworkPolicy,
+## SecurityContext, or RuntimeClass -- the template handles it all.
+##
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxClaim
+metadata:
+  name: demo-agent
+  namespace: agent-demo
+  labels:
+    strategy-profile: restricted
+spec:
+  sandboxTemplateRef:
+    name: restricted-profile

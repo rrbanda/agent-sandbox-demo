@@ -1,0 +1,76 @@
+##
+## Sandbox Router -- Reverse proxy that routes SDK requests to sandbox pods.
+##
+## The Python SDK sends requests through this router with X-Sandbox-ID headers.
+## The router constructs the internal K8s DNS name and proxies to the correct pod.
+##
+## For the demo, we use LocalTunnel mode: SDK → kubectl port-forward → this service → sandbox pod
+##
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-router-svc
+  namespace: agent-demo
+  labels:
+    app: sandbox-router
+spec:
+  type: ClusterIP
+  selector:
+    app: sandbox-router
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-router
+  namespace: agent-demo
+  labels:
+    app: sandbox-router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sandbox-router
+  template:
+    metadata:
+      labels:
+        app: sandbox-router
+    spec:
+      containers:
+      - name: router
+        ## Uses internal registry (not external route) because the router runs
+        ## on a standard pod (not Kata), so cluster-internal DNS resolves fine.
+        image: image-registry.openshift-image-registry.svc:5000/agent-demo/sandbox-router:latest
+        env:
+        - name: PROXY_TIMEOUT_SECONDS
+          value: "180"
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]

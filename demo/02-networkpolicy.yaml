@@ -1,0 +1,51 @@
+##
+## NetworkPolicy for sandboxed agent pods.
+##
+## In production, the agent-sandbox controller auto-creates per-sandbox
+## NetworkPolicy. For this demo (controller v0.2.1), we apply it manually
+## to demonstrate the concept.
+##
+## Policy: default-deny egress, allow only DNS (53) and HTTPS (443)
+## to non-RFC1918 destinations. Blocks metadata server, internal networks.
+##
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-restricted-egress
+  namespace: agent-demo
+  labels:
+    strategy-profile: restricted
+spec:
+  podSelector:
+    matchLabels:
+      app: sandboxed-agent
+  policyTypes:
+  - Egress
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: agent-demo
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - port: 8888
+      protocol: TCP
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 169.254.0.0/16
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    - protocol: TCP
+      port: 443

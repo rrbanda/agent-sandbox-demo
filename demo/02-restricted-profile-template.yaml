@@ -1,0 +1,122 @@
+##
+## Maximum Isolation SandboxTemplate -- Restricted Profile
+##
+## Maps to the strategy's "Restricted" isolation profile:
+##   Secure Baseline (3 pillars)
+##   + OS Layer:        Kata Containers (hardware virtualization via microVM)
+##   + Container Layer: Container Hardening (non-root, drop ALL caps, no privilege escalation)
+##                      automountServiceAccountToken=false (agent-sandbox default)
+##   + Network Layer:   Managed NetworkPolicy (default-deny egress, DNS+HTTPS only,
+##                      blocks RFC1918, metadata server, link-local)
+##
+## From the strategy document:
+##   "kubernetes-sigs/agent-sandbox + Kata = MicroVM (hardware virtualization)
+##    = Untrusted third-party code, maximum isolation"
+##
+## This single template addresses Use Case 2 (AI-Generated Code Execution):
+##   "Generated code can attempt anything -- read other sessions' files,
+##    establish reverse shells, mine cryptocurrency, exfiltrate secrets,
+##    escalate privileges."
+##
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: restricted-profile
+  namespace: agent-demo
+  labels:
+    strategy-profile: restricted
+    isolation: maximum
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        app: sandboxed-agent
+        profile: restricted
+    spec:
+      ## --- OS Layer: Kata Containers (hardware virtualization) ---
+      ## Each sandbox pod runs inside a dedicated lightweight VM.
+      ## Kernel-level isolation: the agent's code never shares a kernel
+      ## with the host or other tenants. This is the strongest isolation
+      ## boundary available without confidential computing (TEE).
+      runtimeClassName: kata-remote
+      nodeSelector:
+        node-role.kubernetes.io/kata-oc: ""
+        node-role.kubernetes.io/worker: ""
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
+
+      ## --- Container Layer: Hardening ---
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+
+      imagePullSecrets:
+      - name: ocp-registry-pull
+
+      restartPolicy: OnFailure
+
+      containers:
+      - name: python-sandbox
+        image: default-route-openshift-image-registry.apps.ocp.v7hjl.sandbox2288.opentlc.com/agent-demo/python-runtime:latest
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8888
+          initialDelaySeconds: 0
+          periodSeconds: 1
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8888
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+
+  ## --- Network Layer: NetworkPolicy ---
+  ## The SandboxTemplate declares the desired NetworkPolicy rules below.
+  ## In v0.3.10+ the controller auto-creates per-sandbox NetworkPolicy from
+  ## this spec. For this demo (v0.2.1) we apply the policy manually via
+  ## 02-networkpolicy.yaml. Either way, the effect is:
+  ##   - Default-deny egress (except rules below)
+  ##   - Blocks RFC1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+  ##   - Blocks link-local / cloud metadata (169.254.0.0/16)
+  ##   - Allows only DNS (port 53) and HTTPS (port 443) to public internet
+  networkPolicy:
+    ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: agent-demo
+      - namespaceSelector:
+          matchLabels:
+            network.openshift.io/policy-group: ingress
+      ports:
+      - port: 8888
+        protocol: TCP
+    egress:
+    - ports:
+      - protocol: UDP
+        port: 53
+      - protocol: TCP
+        port: 53
+    - ports:
+      - protocol: TCP
+        port: 443

@@ -1,0 +1,22 @@
+##
+## SandboxWarmPool for the Restricted profile.
+##
+## Pre-warms 2 Kata-backed sandbox VMs so agent sessions start instantly.
+## Without warm pools, Kata VM cold start takes 15-30 seconds.
+## With warm pools, claim adoption is sub-second.
+##
+## This directly addresses the "Performance overhead" blocker noted in the
+## strategy for Kata Containers -- warm pools turn it from a liability
+## into a non-issue.
+##
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxWarmPool
+metadata:
+  name: restricted-pool
+  namespace: agent-demo
+  labels:
+    strategy-profile: restricted
+spec:
+  sandboxTemplateRef:
+    name: restricted-profile
+  replicas: 2
