@@ -4,13 +4,11 @@ set -euo pipefail
 ##
 ## Sets up a namespace with all agent-sandbox platform resources.
 ##
-## Reusable for both the primary demo namespace and the pre-staged
-## "ready" namespace. Handles: namespace creation, image pull secret,
-## SCC, sandbox-router, template, warm pool, and network policy.
+## Handles: namespace creation, image pull secret, SCC, sandbox-router,
+## template, warm pool, and network policy.
 ##
 ## Usage:
 ##   bash demo/setup-namespace.sh <namespace>
-##   bash demo/setup-namespace.sh agent-demo-ready
 ##
 
 NS="${1:?Usage: setup-namespace.sh <namespace>}"
@@ -82,7 +80,7 @@ echo ""
 echo "[5/7] Applying SandboxTemplate..."
 # Replace metadata.namespace and namespaceSelector; keep image refs pointing at source namespace
 sed "s/^  namespace: ${SRC_NS}/  namespace: ${NS}/g; s|kubernetes.io/metadata.name: ${SRC_NS}|kubernetes.io/metadata.name: ${NS}|g" \
-  "$SCRIPT_DIR/02-restricted-profile-template.yaml" | kubectl apply -f -
+  "$SCRIPT_DIR/02-python-sandbox-template.yaml" | kubectl apply -f -
 echo ""
 
 # --- 6. Apply NetworkPolicy ---
@@ -113,11 +111,11 @@ echo "============================================"
 echo " Namespace '$NS' is ready"
 echo "============================================"
 echo ""
-echo "  SandboxTemplate: restricted-profile"
+echo "  SandboxTemplate: python-sandbox-template"
 echo "  SandboxWarmPool: $(kubectl get sandboxwarmpool -n "$NS" -o jsonpath='{.items[0].status.readyReplicas}' 2>/dev/null || echo '?') ready"
 echo "  NetworkPolicy:   sandbox-restricted-egress"
 echo "  Sandbox Router:  $(kubectl get deployment sandbox-router -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo '?') replica(s)"
 echo ""
 echo "  Run the demo against this namespace:"
-echo "    SANDBOX_NAMESPACE=$NS python3 demo/03-agent-demo.py"
-echo "    cd demo && SANDBOX_NAMESPACE=$NS adk web"
+echo "    kubectl port-forward svc/sandbox-router-svc -n $NS 8090:8080"
+echo "    cd demo && adk web"

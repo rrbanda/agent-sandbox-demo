@@ -13,7 +13,7 @@ echo "============================================"
 echo ""
 
 # --- 1. Login to OpenShift ---
-echo "[1/9] Logging in to OpenShift..."
+echo "[1/8] Logging in to OpenShift..."
 if ! oc whoami &>/dev/null; then
   oc login "$OCP_API" -u "$OCP_USER" -p "$OCP_PASS" --insecure-skip-tls-verify=true
 fi
@@ -21,7 +21,7 @@ echo "  Logged in as: $(oc whoami)"
 echo ""
 
 # --- 2. Check agent-sandbox controller ---
-echo "[2/9] Checking agent-sandbox controller..."
+echo "[2/8] Checking agent-sandbox controller..."
 CURRENT_IMAGE=$(oc get deployment agent-sandbox-controller -n agent-sandbox-system \
   -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "not-installed")
 
@@ -36,7 +36,7 @@ fi
 echo ""
 
 # --- 3. Create demo namespace ---
-echo "[3/9] Creating namespace '$DEMO_NS'..."
+echo "[3/8] Creating namespace '$DEMO_NS'..."
 if oc get namespace "$DEMO_NS" &>/dev/null; then
   echo "  Namespace already exists"
 else
@@ -47,7 +47,7 @@ oc project "$DEMO_NS"
 echo ""
 
 # --- 4. Verify CRDs ---
-echo "[4/9] Verifying agent-sandbox CRDs..."
+echo "[4/8] Verifying agent-sandbox CRDs..."
 for CRD in sandboxes.agents.x-k8s.io \
             sandboxtemplates.extensions.agents.x-k8s.io \
             sandboxclaims.extensions.agents.x-k8s.io \
@@ -62,7 +62,7 @@ done
 echo ""
 
 # --- 5. Verify Kata ---
-echo "[5/9] Verifying Kata Containers..."
+echo "[5/8] Verifying Kata Containers..."
 if kubectl get runtimeclass kata-remote &>/dev/null; then
   echo "  ✓ kata-remote RuntimeClass available"
 else
@@ -75,7 +75,7 @@ echo "  ✓ $KATA_NODES nodes with Kata support"
 echo ""
 
 # --- 6. Build container images ---
-echo "[6/9] Checking container images..."
+echo "[6/8] Checking container images..."
 IMAGES_MISSING=false
 if ! oc get istag python-runtime:latest -n "$DEMO_NS" &>/dev/null; then
   IMAGES_MISSING=true
@@ -93,12 +93,12 @@ fi
 echo ""
 
 # --- 7. Set up primary demo namespace (platform resources for Act 2 console walkthrough) ---
-echo "[7/9] Setting up '$DEMO_NS' namespace (platform resources for console walkthrough)..."
+echo "[7/8] Setting up '$DEMO_NS' namespace (platform resources for console walkthrough)..."
 bash "$(dirname "$0")/setup-namespace.sh" "$DEMO_NS"
 echo ""
 
 # --- 8. Check Python SDK ---
-echo "[8/9] Checking Python dependencies..."
+echo "[8/8] Checking Python dependencies..."
 python3 -c "import k8s_agent_sandbox" &>/dev/null \
   && echo "  ✓ k8s-agent-sandbox SDK installed" \
   || echo "  ✗ SDK missing -- run: pip install k8s-agent-sandbox"
@@ -107,11 +107,6 @@ python3 -c "import google.adk" &>/dev/null \
   || echo "  ✗ ADK missing -- run: pip install google-adk"
 echo ""
 
-# --- 9. Pre-stage the "ready" namespace ---
-READY_NS="${READY_NS:-agent-demo-ready}"
-echo "[9/9] Pre-staging '$READY_NS' namespace (warm pool pre-warmed)..."
-bash "$(dirname "$0")/setup-namespace.sh" "$READY_NS"
-echo ""
 
 echo "============================================"
 echo " Setup complete"
@@ -124,19 +119,14 @@ echo ""
 echo "OpenShift Console:"
 echo "  https://console-openshift-console.apps.ocp.v7hjl.sandbox2288.opentlc.com"
 echo ""
-echo "Demo flow (two screens: Console + Terminal):"
+echo "Next steps (run in separate terminals before demo):"
 echo ""
-echo "  Act 1 [Terminal] -- The Threat (namespace: agent-demo):"
-echo "    kubectl apply -f demo/01-bare-pod.yaml"
-echo "    python3 demo/01-attack-script.py"
+echo "  Terminal 1 -- port-forward to sandbox-router:"
+echo "    kubectl port-forward svc/sandbox-router-svc -n $DEMO_NS 8090:8080"
 echo ""
-echo "  Act 2 [Console] -- Platform Engineer (namespace: agent-demo):"
-echo "    Walk through: Sandboxed Containers Operator > agent-sandbox controller"
-echo "    > SandboxTemplate > WarmPool > NetworkPolicy > Sandboxes (leave open)"
+echo "  Terminal 2 -- start ADK web server:"
+echo "    cd demo && adk web"
 echo ""
-echo "  Act 3 [Terminal + Console] -- Developer (namespace: $READY_NS):"
-echo "    SANDBOX_NAMESPACE=$READY_NS python3 demo/03-agent-demo.py"
-echo "    (watch Sandbox CR appear/disappear in console)"
-echo "    cd demo && SANDBOX_NAMESPACE=$READY_NS adk web  # ADK web UI"
+echo "  Then open http://127.0.0.1:8000 and follow demo/RUNBOOK.md"
 echo ""
 echo "  Cleanup: bash demo/99-cleanup.sh"

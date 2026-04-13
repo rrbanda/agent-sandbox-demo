@@ -22,7 +22,7 @@ _client = SandboxClient(connection_config=SandboxLocalTunnelConnectionConfig())
 
 def execute_python(code: str):
     sandbox = _client.create_sandbox(
-        template=os.environ.get("SANDBOX_TEMPLATE", "restricted-profile"),
+        template=os.environ.get("SANDBOX_TEMPLATE", "python-sandbox-template"),
         namespace=os.environ.get("SANDBOX_NAMESPACE", "agent-demo"),
     )
     try:

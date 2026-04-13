@@ -133,7 +133,7 @@ Maintains a pool of pre-created, ready-to-use sandbox pods.
 
 ### Policy Examples (Upstream Reference)
 
-The upstream agent-sandbox project describes a **ValidatingAdmissionPolicy** pattern that enforces security controls such as requiring a sandbox runtime, blocking host networking, dropping ALL capabilities, enforcing runAsNonRoot, and preventing privilege escalation. This demo achieves the same controls declaratively through the `SandboxTemplate` in `demo/02-restricted-profile-template.yaml` rather than a separate VAP resource.
+The upstream agent-sandbox project describes a **ValidatingAdmissionPolicy** pattern that enforces security controls such as requiring a sandbox runtime, blocking host networking, dropping ALL capabilities, enforcing runAsNonRoot, and preventing privilege escalation. This demo achieves the same controls declaratively through the `SandboxTemplate` in `demo/02-python-sandbox-template.yaml` rather than a separate VAP resource.
 
 ---
 

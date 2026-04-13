@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 from k8s_agent_sandbox import SandboxClient
 from k8s_agent_sandbox.models import SandboxLocalTunnelConnectionConfig
 
-TEMPLATE = os.environ.get("SANDBOX_TEMPLATE", "restricted-profile")
+TEMPLATE = os.environ.get("SANDBOX_TEMPLATE", "python-sandbox-template")
 NAMESPACE = os.environ.get("SANDBOX_NAMESPACE", "agent-demo")
 
 DIV = "=" * 64

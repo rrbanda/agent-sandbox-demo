@@ -21,7 +21,7 @@
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
-  name: restricted-profile
+  name: python-sandbox-template
   namespace: agent-demo
   labels:
     strategy-profile: restricted
