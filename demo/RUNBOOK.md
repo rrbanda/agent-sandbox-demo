@@ -2,7 +2,7 @@
 
 **This document is your single reference during the live demo. Do not show it to the audience.**
 
-**Duration:** ~17 minutes
+**Duration:** ~20 minutes
 **Audience:** Agent experts + executive
 **Format:** Tell-Show-Tell (slide, console walkthrough, ADK web UI, slides)
 **Environment:** OpenShift 4.20, agent-sandbox v0.2.1, Kata Containers, gpt-oss-120b on-cluster LLM
@@ -44,40 +44,58 @@ Open these before you begin:
 ---
 ---
 
-# TELL -- Opening (2 min, slide)
+# TELL -- Opening (4 min, slides)
 
 ---
 
-## Slide 1: The Problem + Architecture
+## Slides 1-2: Title + Agenda
 
-**SLIDE:**
+(Your deck's opening slides. Follow whatever is on screen.)
 
-```
-Agent Sandboxing with Kubernetes
+---
 
-  AI agents execute unreviewed, LLM-generated code.
-  Three risks without isolation:
-
-    1. Cloud credential theft     (metadata server at 169.254.169.254)
-    2. Lateral movement           (internal network, RFC1918)
-    3. Kubernetes API access      (auto-mounted service account token)
-
-  Today: kubernetes-sigs/agent-sandbox + Kata Containers
-         One SandboxTemplate. Four isolation layers. 7 lines of Python.
-```
+## Slide 3: Isolation Profiles + Secure Baseline
 
 **SAY:**
 
-> **CONCEPT -- why agents are different from normal workloads:**
-> "Traditional workloads run reviewed, tested code. Agent workloads run LLM-generated code -- unreviewed, unscanned, potentially adversarial. Without isolation, that code can steal cloud credentials from the metadata server, probe internal services, and read the Kubernetes service account token mounted into every pod by default."
+> "Every profile has the full secure baseline -- Authentication, Authorization, Encryption, Budget Proxy, AuthBridge, Egress Proxy, Human Oversight, Audit Trail. The difference is which additional sandboxing layer controls are enabled."
 
-> **CONCEPT -- why not Deployments or StatefulSets:**
-> "You might ask: why not just use a Deployment? Agent workloads are fundamentally different -- singleton, stateful, per-session, with automatic expiration. A Deployment wants N identical replicas. agent-sandbox gives you the missing primitive -- think of it as StatefulSet for agents."
+> "Profiles combine the secure baseline with composable controls from different sandboxing layers to match the isolation level required by the use case. Every profile upholds all three security pillars."
 
-> **CONCEPT -- decoupled isolation:**
-> "agent-sandbox is runtime-agnostic. Four CRDs, one standardized API. It works with Kata, gVisor, or runc. Today we're showing Kata for maximum isolation -- each sandbox runs in its own microVM -- but the same template could swap runtimes without changing developer code."
+> "Today we're demonstrating the Restricted profile -- the maximum isolation level -- using Kata Containers for hardware virtualization."
+
+---
+
+## Slides 4-5
+
+(Follow your deck.)
+
+---
+
+## Slide 6: agent-sandbox Architecture
+
+**SAY:**
+
+> **Core: Sandbox CRD**
+> "The Sandbox CRD is the core of agent-sandbox. It provides a declarative API for managing a single, stateful pod with a stable identity and persistent storage. This is useful for workloads that don't fit into the stateless, replicated model of Deployments or the numbered, stable model of StatefulSets."
+
+> "Key features: stable hostname and network identity, persistent storage that survives restarts, and lifecycle management -- creation, scheduled deletion, pausing and resuming."
+
+> **Extensions**
+> "The extensions module provides additional CRDs that build on the core Sandbox API:"
+> "**SandboxTemplate** -- reusable templates for creating Sandboxes, making it easier to manage large numbers of similar Sandboxes."
+> "**SandboxClaim** -- lets users create Sandboxes from a template, abstracting away the underlying configuration."
+> "**SandboxWarmPool** -- manages a pool of pre-warmed Sandbox pods that can be quickly allocated, reducing startup time."
+
+> "agent-sandbox follows the Kubernetes controller pattern. Users create a Sandbox custom resource, and the controller manages the underlying runtime resources."
 
 > "Let me show you what this looks like on a live cluster."
+
+---
+
+## Slide 7
+
+(Follow your deck.)
 
 **DO:** Switch to OpenShift Console.
 
@@ -150,8 +168,18 @@ Scroll through the YAML, pointing out:
 > **1. `runtimeClassName: kata-remote`**
 > "Every sandbox runs inside its own Kata microVM. The agent's code never shares a kernel with the host."
 
-> **2. `automountServiceAccountToken: false`**
-> "Kubernetes mounts a service account JWT into every pod by default. This line removes it. No K8s credentials inside the sandbox."
+> **2. `automountServiceAccountToken: false`** (Slide 8 deep dive -- expand if audience is technical)
+> "This is critical. Every pod in Kubernetes gets a service account. By default, Kubernetes mounts a JWT token at `/var/run/secrets/kubernetes.io/serviceaccount/token`. That token lets the process authenticate to the Kubernetes API server."
+
+> "The token is a signed JWT containing the namespace, service account name, and cluster identity. Any process that reads it can call the K8s API as that service account."
+
+> "What can an attacker do? Depends on RBAC. With the default SA: list pods, services, endpoints. Read ConfigMaps -- which often contain connection strings. In misconfigured clusters: read Secrets, create pods, escalate. Even with minimal RBAC, the token reveals the namespace name, cluster CA, and proves the pod is a valid cluster member -- useful for reconnaissance."
+
+> "With `automountServiceAccountToken: false`, the kubelet does not mount the token, CA cert, or namespace file. The directory `/var/run/secrets/kubernetes.io/serviceaccount/` simply doesn't exist. Zero Kubernetes credentials."
+
+> "Why this matters for agents specifically: an AI agent executes LLM-generated code. That code could do `open('/var/run/secrets/.../token').read()` and call the K8s API. With this flag set, that fails immediately -- no file to read."
+
+> "Notice it's set at `podTemplate.spec` level, not container level. This is a pod-level field -- it ensures no container in the pod, including sidecars, gets the token. One line, total credential removal."
 
 > **3. `securityContext` block**
 > "`runAsNonRoot`, `drop ALL capabilities`, `no privilege escalation`. Even inside the VM, the process runs as non-root with zero Linux capabilities."
@@ -284,11 +312,11 @@ Point at the console: "The Sandbox CR is gone. Ephemeral, per-execution."
 ---
 ---
 
-# TELL -- Closing (3 min, slides)
+# TELL -- Closing (4 min, slides)
 
 ---
 
-## Slide 2: What You Just Saw
+## Slide 9: What You Just Saw
 
 **SLIDE:**
 
@@ -309,7 +337,32 @@ Walk through each row briefly.
 
 ---
 
-## Slide 3: Three Things You Saw
+## Slide 10: AgentOps -- From Experiment to Production
+
+**SAY:**
+
+> "Now, let's zoom in to AgentOps."
+
+> "AgentOps is how we bridge the gap between experimental AI and production agents. It's a unified approach for managing the full lifecycle, security, and performance of AI agents and their tools."
+
+> "Roughly three pillars."
+
+> **Pillar 1 -- Observe, Trace, Evaluate:**
+> "We use MLflow 3.6+ to log and visualize full execution traces, including tool calls. Everything is OpenTelemetry compatible, so it plugs into existing observability stacks. For evaluation, we combine Eval-hub and MLflow for dataset curation and scoring -- so you're not just watching agents run, you're measuring whether they're actually working."
+
+> **Pillar 2 -- Enforce Identity and Access Control:**
+> "Agents are autonomous actors, so they need their own identity. Upcoming: SPIFFE and SPIRE for trusted workload identity, OAuth2 token exchange for secure delegation, Kagenti for agentic auth and access control. The MCP Gateway governs agent-to-tool access -- making sure agents can only reach the tools they're authorized to use."
+
+> **Pillar 3 -- Develop and Deploy Reliably:**
+> "This covers agent and AI asset management, agent lifecycle management through Kagenti -- which connects agents with identity and policies -- and agent safety using guardrails and red teaming tools like Nemo and Garak."
+
+> "The bottom line: we are providing enterprises the operational rigor to reliably move agents from experimentation to production -- without locking them into any single framework."
+
+> "What you saw today -- the sandbox, the template, the warm pool, the SDK -- that's the isolation layer. AgentOps wraps the rest around it: observability, identity, lifecycle."
+
+---
+
+## Slide 11: Three Things You Saw
 
 **SLIDE:**
 
@@ -388,10 +441,10 @@ Pause. Open for Q&A.
 
 | Phase | Primary Screen | Secondary Screen |
 |---|---|---|
-| TELL (slide) | Slide | -- |
-| Console walkthrough | OpenShift Console | -- |
-| ADK demo | ADK browser tab | Console Sandboxes view |
-| TELL (slides) | Slides | -- |
+| TELL -- Opening (Slides 1-7) | Slides | -- |
+| Console walkthrough (Steps 1-6) | OpenShift Console | -- |
+| ADK demo (Prompts 1-2) | ADK browser tab | Console Sandboxes view |
+| TELL -- Closing (Slides 9-11) | Slides | -- |
 
 ## Key URLs
 
